@@ -1,0 +1,118 @@
+---
+services:
+  nginx:
+    image: nginx:latest
+    container_name: lemp-nginx
+    hostname: lemp-nginx    
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html:ro
+      - ./nginx:/etc/nginx/conf.d:ro
+    networks:
+      - lemp-net 
+    depends_on:
+      - php 
+         
+  php:
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    container_name: lemp-php
+    hostname: lemp-php
+    restart: unless-stopped
+    volumes:
+      - ./src:/var/www/html
+    networks:
+      - lemp-net
+    depends_on:
+      mysql:
+        condition: service_healthy          
+      mariadb:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:latest
+    container_name: lemp-mysql
+    hostname: lemp-mysql    
+    restart: unless-stopped
+    ports:
+      - "33060:3306"
+    volumes:
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      - mysql-data:/var/lib/mysql 
+    networks:
+      - lemp-net    
+    environment:     
+      TZ: America/Jamaica
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME} 
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mariadb:
+    image: mariadb:latest
+    container_name: lemp-mariadb
+    hostname: lemp-mariadb
+    restart: unless-stopped
+    ports:
+      - "33061:3306"
+    volumes:
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      - mariadb-data:/var/lib/mysql 
+    networks:
+      - lemp-net       
+    environment:     
+      TZ: America/Jamaica
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
+      MARIADB_DATABASE: ${DB_NAME}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest    
+    container_name: lemp-phpmyadmin
+    hostname: lemp-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - session-data:/sessions
+    networks:
+      - lemp-net
+    environment:
+      PMA_ARBITRARY: 1
+      PMA_HOSTS: mysql,mariadb
+      PMA_PORTS: 3306,3306
+    depends_on: 
+      mysql:
+        condition: service_healthy          
+      mariadb:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
+  mariadb-data:
+  session-data:
+
+networks:
+  lemp-net:
+    driver: bridge
+
+
+            
+
+
